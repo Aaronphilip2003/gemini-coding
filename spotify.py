@@ -5,55 +5,68 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def get_playlist_names():
+def get_songs_from_playlist(playlist_name):
     """
-    Connects to the Spotify API and fetches the current user's playlist names.
+    Connects to the Spotify API and fetches all songs from a specific playlist.
 
-    Requires the following environment variables to be set in a .env file:
-    - SPOTIPY_CLIENT_ID: Your Spotify application's client ID.
-    - SPOTIPY_CLIENT_SECRET: Your Spotify application's client secret.
-    - SPOTIPY_REDIRECT_URI: The redirect URI configured in your Spotify app.
+    Requires environment variables for Spotify authentication.
     """
-    # Check for environment variables
-    if not all(k in os.environ for k in ["SPOTIPY_CLIENT_ID", "SPOTIPY_CLIENT_SECRET", "SPOTIPY_REDIRECT_URI"]):
-        print("Error: Make sure you have set the SPOTIPY_CLIENT_ID, SPOTIPY_CLIENT_SECRET, and SPOTIPY_REDIRECT_URI environment variables in your .env file.")
-        return
-
     # Set up authentication
     scope = "playlist-read-private"
-    auth_manager = SpotifyOAuth(scope=scope)
-    sp = spotipy.Spotify(auth_manager=auth_manager)
-
-    # Get the current user's username
     try:
+        auth_manager = SpotifyOAuth(scope=scope)
+        sp = spotipy.Spotify(auth_manager=auth_manager)
         user = sp.current_user()
-        username = user['id']
+        print(f"Authenticated as {user['display_name']} ({user['id']}).")
     except Exception as e:
-        print(f"Error getting user info: {e}")
+        print(f"Error during authentication: {e}")
         print("Could not authenticate. Please check your credentials and try again.")
         return
 
-    print(f"Authenticated as {user['display_name']} ({username}). Fetching playlists...")
-
-    # Get playlists
+    # Find the target playlist
+    print(f"Searching for playlist: '{playlist_name}'...")
     playlists = []
     results = sp.current_user_playlists(limit=50)
-    
-    while results:
+    playlists.extend(results['items'])
+    while results['next']:
+        results = sp.next(results)
         playlists.extend(results['items'])
-        if results['next']:
-            results = sp.next(results)
-        else:
-            results = None
 
-    if not playlists:
-        print("You don't have any playlists yet.")
+    target_playlist = None
+    for playlist in playlists:
+        if playlist['name'] == playlist_name:
+            target_playlist = playlist
+            break
+
+    if not target_playlist:
+        print(f"Error: Playlist '{playlist_name}' not found.")
         return
 
-    # Print playlist names
-    print("\nYour Spotify Playlists:")
-    for i, playlist in enumerate(playlists):
-        print(f"{i + 1}. {playlist['name']}")
+    print(f"Found playlist! ID: {target_playlist['id']}")
+    print("\nFetching songs from '{playlist_name}'...")
+
+    # Get all tracks from the playlist
+    tracks = []
+    results = sp.playlist_items(target_playlist['id'], fields='items(track(name, artists(name))),next')
+    tracks.extend(results['items'])
+    while results['next']:
+        results = sp.next(results)
+        tracks.extend(results['items'])
+
+    if not tracks:
+        print("No songs found in this playlist.")
+        return
+
+    # Print song names and artists
+    print(f"\n--- Songs in {playlist_name} ---")
+    for i, item in enumerate(tracks):
+        track = item.get('track')
+        if track:
+            song_name = track['name']
+            artist_name = track['artists'][0]['name'] if track['artists'] else 'Unknown Artist'
+            print(f"{i + 1}. {song_name} - {artist_name}")
 
 if __name__ == "__main__":
-    get_playlist_names()
+    # Name of the playlist you want to get songs from
+    target_playlist_name = "LikedSongsPlayList2025"
+    get_songs_from_playlist(target_playlist_name)
