@@ -1,5 +1,6 @@
 import os
 import spotipy
+import csv
 from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
 
@@ -57,14 +58,24 @@ def get_songs_from_playlist(playlist_name):
         print("No songs found in this playlist.")
         return
 
-    # Print song names and artists
-    print(f"\n--- Songs in {playlist_name} ---")
-    for i, item in enumerate(tracks):
-        track = item.get('track')
-        if track:
-            song_name = track['name']
-            artist_name = track['artists'][0]['name'] if track['artists'] else 'Unknown Artist'
-            print(f"{i + 1}. {song_name} - {artist_name}")
+    # Save songs to a CSV file
+    csv_file_name = f"{playlist_name}.csv"
+    try:
+        with open(csv_file_name, 'w', newline='', encoding='utf-8') as csvfile:
+            fieldnames = ['Song Name', 'Artist Name']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+            writer.writeheader()
+            for item in tracks:
+                track = item.get('track')
+                if track:
+                    song_name = track['name']
+                    artist_name = track['artists'][0]['name'] if track['artists'] else 'Unknown Artist'
+                    writer.writerow({'Song Name': song_name, 'Artist Name': artist_name})
+        print(f"\nSuccessfully saved songs to '{csv_file_name}'.")
+    except IOError as e:
+        print(f"\nError writing to CSV file: {e}")
+
 
 if __name__ == "__main__":
     # Name of the playlist you want to get songs from
